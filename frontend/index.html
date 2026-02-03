@@ -631,6 +631,7 @@
   }
 
   let vaHistory = [];
+  let lastEmotion = null; // {label, valence, arousal, confidence}
 
   function drawVA() {
     const w = vaCanvas.width, h = vaCanvas.height;
@@ -727,9 +728,10 @@
       vaCtx.arc(x, y, 9, 0, Math.PI*2);
       vaCtx.stroke();
 
-      // readout
+      // readout (must match the label shown above; both come from lastEmotion)
       vaCtx.fillStyle = 'rgba(15,23,42,0.75)';
-      vaCtx.fillText(`v=${p.v.toFixed(2)}  a=${p.a.toFixed(2)}`, x0, y0 - 10);
+      const lab = (lastEmotion && typeof lastEmotion.label === 'string') ? lastEmotion.label : '--';
+      vaCtx.fillText(`${lab}   v=${p.v.toFixed(2)}  a=${p.a.toFixed(2)}`, x0, y0 - 10);
     }
   }
 
@@ -843,16 +845,19 @@
       const aro = Number(msg.emotion.arousal);
       const conf = Number(msg.emotion.confidence);
 
-      emotionLabelEl.textContent = label;
-      emojiEl.textContent = emojiFor(label, val, aro);
-
-      valenceEl.textContent = Number.isFinite(val) ? val.toFixed(2) : '--';
-      arousalEl.textContent = Number.isFinite(aro) ? aro.toFixed(2) : '--';
-      confidenceEl.textContent = Number.isFinite(conf) ? conf.toFixed(2) : '--';
-
-      if (Number.isFinite(aro)) arousalBarEl.style.width = pct01(aro);
-
+      // Single source of truth: store lastEmotion, and derive BOTH the top label and the VA plot from it.
       if (Number.isFinite(val) && Number.isFinite(aro)) {
+        lastEmotion = { label, val, aro, conf };
+
+        emotionLabelEl.textContent = label;
+        emojiEl.textContent = emojiFor(label, val, aro);
+
+        valenceEl.textContent = val.toFixed(2);
+        arousalEl.textContent = aro.toFixed(2);
+        confidenceEl.textContent = Number.isFinite(conf) ? conf.toFixed(2) : '--';
+
+        arousalBarEl.style.width = pct01(aro);
+
         vaHistory.push({ v: Math.max(-1, Math.min(1, val)), a: clamp01(aro) });
         if (vaHistory.length > 120) vaHistory.shift();
       }
