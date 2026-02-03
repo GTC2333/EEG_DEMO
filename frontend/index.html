@@ -1,0 +1,887 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EEG Emotion Demo</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --panel: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --border: rgba(17,24,39,0.10);
+      --shadow: 0 10px 28px rgba(17,24,39,0.10);
+      --accent: #2563eb;
+      --good: #16a34a;
+      --warn: #f59e0b;
+      --bad: #dc2626;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      background: radial-gradient(1200px 600px at 20% -10%, rgba(37,99,235,0.12), transparent 60%),
+                  radial-gradient(900px 500px at 90% 10%, rgba(245,158,11,0.10), transparent 55%),
+                  var(--bg);
+      color: var(--text);
+    }
+
+    .container {
+      width: min(1400px, calc(100vw - 28px));
+      margin: 0 auto;
+      padding: 18px 0;
+    }
+
+    .topbar {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      background: rgba(255,255,255,0.70);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      backdrop-filter: blur(8px);
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .brand .title {
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+    }
+
+    .brand .subtitle {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .pill {
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .grid {
+      margin-top: 14px;
+      display: grid;
+      gap: 14px;
+      grid-template-columns: minmax(420px, 0.45fr) minmax(560px, 0.55fr);
+      align-items: stretch;
+      position: relative;
+    }
+
+    .splitter {
+      background: rgba(15,23,42,0.06);
+      border: 1px solid rgba(15,23,42,0.10);
+      border-radius: 10px;
+      transition: background 120ms ease;
+      user-select: none;
+      touch-action: none;
+    }
+
+    .splitter:hover {
+      background: rgba(37,99,235,0.10);
+      border-color: rgba(37,99,235,0.22);
+    }
+
+    .splitter.v {
+      width: 10px;
+      cursor: col-resize;
+      align-self: stretch;
+      justify-self: stretch;
+    }
+
+    .splitter.h {
+      height: 10px;
+      cursor: row-resize;
+      width: 100%;
+    }
+
+    .rightStack {
+      display: grid;
+      grid-template-rows: auto auto auto;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .cardCompact {
+      padding: 16px;
+    }
+
+    @media (max-width: 1100px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+
+    .card h2 {
+      margin: 0 0 10px 0;
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--muted);
+      letter-spacing: 0.35px;
+      text-transform: uppercase;
+    }
+
+    .emotionRow {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .emoji {
+      width: 92px;
+      height: 92px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      font-size: 52px;
+      background: rgba(37,99,235,0.10);
+      border: 1px solid rgba(37,99,235,0.16);
+      flex: 0 0 auto;
+    }
+
+    .emotionLabel {
+      font-size: 34px;
+      font-weight: 900;
+      line-height: 1.05;
+      letter-spacing: 0.2px;
+    }
+
+    .hint {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .kv {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      row-gap: 10px;
+      column-gap: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .kv b {
+      color: var(--text);
+      font-weight: 800;
+    }
+
+    .bar {
+      height: 10px;
+      background: rgba(17,24,39,0.06);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid rgba(17,24,39,0.06);
+    }
+
+    .bar > div {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, rgba(37,99,235,0.95), rgba(34,197,94,0.95));
+      border-radius: 999px;
+      transition: width 240ms ease;
+    }
+
+    .miniGrid {
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .mini {
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(17,24,39,0.08);
+      background: linear-gradient(180deg, rgba(37,99,235,0.06), rgba(255,255,255,0.0));
+    }
+
+    .mini .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.35px; }
+    .mini .v { margin-top: 4px; font-size: 14px; font-weight: 850; }
+    .mini .spark {
+      margin-top: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(17,24,39,0.06);
+      overflow: hidden;
+      border: 1px solid rgba(17,24,39,0.06);
+    }
+    .mini .spark > div {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      transition: width 240ms ease;
+      background: linear-gradient(90deg, rgba(34,197,94,0.95), rgba(37,99,235,0.95));
+    }
+
+    .smallPlot {
+      width: 100%;
+      height: 260px;
+      border-radius: 12px;
+      border: 1px solid rgba(17,24,39,0.08);
+      background: linear-gradient(180deg, rgba(17,24,39,0.03), rgba(17,24,39,0.01));
+    }
+
+
+    canvas {
+      width: 100%;
+      height: 520px;
+      background: linear-gradient(180deg, rgba(17,24,39,0.03), rgba(17,24,39,0.01));
+      border-radius: 12px;
+      border: 1px solid rgba(17,24,39,0.08);
+    }
+
+    @media (max-width: 1100px) {
+      canvas { height: 380px; }
+    }
+
+    .status {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 8px;
+      background: #9ca3af;
+    }
+
+    .dot.ok { background: var(--good); }
+    .dot.bad { background: var(--bad); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <div class="brand">
+        <div class="title">EEG Emotion Demo</div>
+        <div class="subtitle">Mock EEG + Band Power → Valence/Arousal → UI</div>
+      </div>
+      <div class="pill" id="wsInfo">WS: --</div>
+    </div>
+
+    <div class="grid" id="mainGrid">
+      <div class="card" id="leftCard">
+        <h2>Current Emotion</h2>
+        <div class="emotionRow">
+          <div class="emoji" id="emoji">--</div>
+          <div>
+            <div id="emotionLabel" class="emotionLabel">--</div>
+            <div class="hint">Auto-updated from backend estimates</div>
+          </div>
+        </div>
+
+        <div class="kv">
+          <div>Valence</div><div><b id="valence">--</b></div>
+          <div>Arousal</div><div><b id="arousal">--</b></div>
+          <div>Confidence</div><div><b id="confidence">--</b></div>
+          <div>Arousal bar</div>
+          <div class="bar"><div id="arousalBar"></div></div>
+        </div>
+
+        <h2 style="margin-top:14px">Band Power (relative)</h2>
+        <div class="miniGrid">
+          <div class="mini">
+            <div class="k">Alpha power</div>
+            <div class="v" id="alphaVal">--</div>
+            <div class="spark"><div id="alphaBar"></div></div>
+          </div>
+          <div class="mini">
+            <div class="k">Beta power</div>
+            <div class="v" id="betaVal">--</div>
+            <div class="spark"><div id="betaBar"></div></div>
+          </div>
+          <div class="mini">
+            <div class="k">Theta power</div>
+            <div class="v" id="thetaVal">--</div>
+            <div class="spark"><div id="thetaBar"></div></div>
+          </div>
+          <div class="mini">
+            <div class="k">Gamma power</div>
+            <div class="v" id="gammaVal">--</div>
+            <div class="spark"><div id="gammaBar"></div></div>
+          </div>
+        </div>
+
+        <h2 style="margin-top:14px">Valence–Arousal (live)</h2>
+        <canvas class="smallPlot" id="va" width="1200" height="260"></canvas>
+
+        <div class="status">
+          <div id="status"><span class="dot" id="dot"></span>Connecting...</div>
+          <div id="channels">Channels: --</div>
+        </div>
+      </div>
+
+      <div class="splitter v" id="splitV" aria-label="Resize panels"></div>
+
+      <div class="card" id="rightCard">
+        <div class="rightStack" id="rightStack">
+          <div>
+            <h2>EEG Waveform (more channels)</h2>
+            <canvas id="plot" width="1200" height="520"></canvas>
+            <div class="status">
+              <div class="hint">Tip: append <code>?ws_port=55141</code> if your WS is on a different port.</div>
+            </div>
+          </div>
+
+          <div class="splitter h" id="splitH" aria-label="Resize right panels"></div>
+
+          <div>
+            <h2 style="margin-top:0">EEG Channels (16)</h2>
+            <canvas class="smallPlot" id="grid" width="1200" height="540"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const qs = new URLSearchParams(location.search);
+  // default to the exposed WS port in this demo environment
+  const WS_PORT = qs.get('ws_port') || '55141';
+  const WS_URL = `ws://${location.hostname}:${WS_PORT}`;
+
+  const wsInfoEl = document.getElementById('wsInfo');
+  const dotEl = document.getElementById('dot');
+  const emojiEl = document.getElementById('emoji');
+  const arousalBarEl = document.getElementById('arousalBar');
+
+  const statusEl = document.getElementById('status');
+  const channelsEl = document.getElementById('channels');
+
+  const emotionLabelEl = document.getElementById('emotionLabel');
+  const valenceEl = document.getElementById('valence');
+  const arousalEl = document.getElementById('arousal');
+  const confidenceEl = document.getElementById('confidence');
+
+  const canvas = document.getElementById('plot');
+  const ctx = canvas.getContext('2d');
+
+  const gridCanvas = document.getElementById('grid');
+  const gridCtx = gridCanvas.getContext('2d');
+
+  const vaCanvas = document.getElementById('va');
+  const vaCtx = vaCanvas.getContext('2d');
+
+  const alphaValEl = document.getElementById('alphaVal');
+  const betaValEl = document.getElementById('betaVal');
+  const thetaValEl = document.getElementById('thetaVal');
+  const gammaValEl = document.getElementById('gammaVal');
+  const alphaBarEl = document.getElementById('alphaBar');
+  const betaBarEl = document.getElementById('betaBar');
+  const thetaBarEl = document.getElementById('thetaBar');
+  const gammaBarEl = document.getElementById('gammaBar');
+
+  function clamp01(x) { return Math.max(0, Math.min(1, x)); }
+
+  // --- Resizable layout (must be after canvas init) ---
+  const mainGridEl = document.getElementById('mainGrid');
+  const leftCardEl = document.getElementById('leftCard');
+  const rightCardEl = document.getElementById('rightCard');
+  const splitVEl = document.getElementById('splitV');
+  const rightStackEl = document.getElementById('rightStack');
+  const splitHEl = document.getElementById('splitH');
+
+  function cssPx(n) { return `${Math.round(n)}px`; }
+
+  function setCanvasSize(canvasEl) {
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const rect = canvasEl.getBoundingClientRect();
+    const w = Math.max(10, Math.floor(rect.width * dpr));
+    const h = Math.max(10, Math.floor(rect.height * dpr));
+    if (canvasEl.width !== w) canvasEl.width = w;
+    if (canvasEl.height !== h) canvasEl.height = h;
+  }
+
+  function resizeCanvases() {
+    setCanvasSize(canvas);
+    setCanvasSize(gridCanvas);
+    setCanvasSize(vaCanvas);
+  }
+
+  function applyLayoutFromStorage() {
+    const w = mainGridEl.getBoundingClientRect().width;
+    const savedLeft = Number(localStorage.getItem('eeg_demo_left_w'));
+    if (Number.isFinite(savedLeft) && savedLeft > 200) {
+      const left = Math.max(360, Math.min(w - 360, savedLeft));
+      mainGridEl.style.gridTemplateColumns = `${cssPx(left)} 10px 1fr`;
+    } else {
+      mainGridEl.style.gridTemplateColumns = `minmax(420px, 0.45fr) 10px minmax(560px, 0.55fr)`;
+    }
+
+    const savedTop = Number(localStorage.getItem('eeg_demo_right_top_h'));
+    if (Number.isFinite(savedTop) && savedTop > 120) {
+      const rightH = rightCardEl.getBoundingClientRect().height;
+      const top = Math.max(220, Math.min(rightH - 220, savedTop));
+      rightStackEl.style.gridTemplateRows = `${cssPx(top)} 10px 1fr`;
+    }
+
+    resizeCanvases();
+  }
+
+  function makeDrag(el, axis) {
+    let dragging = false;
+    let startX = 0;
+    let startY = 0;
+    let startLeftW = 0;
+    let startTopH = 0;
+
+    el.addEventListener('pointerdown', (e) => {
+      if (window.matchMedia('(max-width: 1100px)').matches && axis === 'x') return;
+      dragging = true;
+      el.setPointerCapture(e.pointerId);
+      startX = e.clientX;
+      startY = e.clientY;
+
+      startLeftW = leftCardEl.getBoundingClientRect().width;
+      startTopH = rightStackEl.children[0].getBoundingClientRect().height;
+
+      document.body.style.cursor = (axis === 'x') ? 'col-resize' : 'row-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    });
+
+    el.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+
+      if (axis === 'x') {
+        const dx = e.clientX - startX;
+        const gridW = mainGridEl.getBoundingClientRect().width;
+        const left = Math.max(360, Math.min(gridW - 360, startLeftW + dx));
+        mainGridEl.style.gridTemplateColumns = `${cssPx(left)} 10px 1fr`;
+        localStorage.setItem('eeg_demo_left_w', String(left));
+      } else {
+        const dy = e.clientY - startY;
+        const rightH = rightCardEl.getBoundingClientRect().height;
+        const top = Math.max(220, Math.min(rightH - 220, startTopH + dy));
+        rightStackEl.style.gridTemplateRows = `${cssPx(top)} 10px 1fr`;
+        localStorage.setItem('eeg_demo_right_top_h', String(top));
+      }
+
+      resizeCanvases();
+    });
+
+    function stop(e) {
+      if (!dragging) return;
+      dragging = false;
+      try { el.releasePointerCapture(e.pointerId); } catch {}
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      resizeCanvases();
+    }
+
+    el.addEventListener('pointerup', stop);
+    el.addEventListener('pointercancel', stop);
+  }
+
+  makeDrag(splitVEl, 'x');
+  makeDrag(splitHEl, 'y');
+
+  window.addEventListener('resize', applyLayoutFromStorage);
+  applyLayoutFromStorage();
+  // --- end resizable layout ---
+
+  function pct01(x) { return `${Math.round(clamp01(x) * 100)}%`; }
+
+  function emojiFor(label, valence, arousal) {
+    const map = {
+      Calm: '😌',
+      Focused: '🧠',
+      Excited: '😄',
+      Stressed: '😣',
+      Fatigued: '😴'
+    };
+    if (label && map[label]) return map[label];
+
+    const v = (typeof valence === 'number') ? valence : 0;
+    const a = (typeof arousal === 'number') ? arousal : 0.5;
+    if (a > 0.6 && v > 0) return '😄';
+    if (a > 0.6 && v < 0) return '😣';
+    if (a < 0.4 && v > 0) return '😌';
+    if (a < 0.4 && v < 0) return '😴';
+    return '🧠';
+  }
+
+  wsInfoEl.textContent = `WS: ${WS_URL}`;
+
+  const bandOrder = ['delta','theta','alpha','beta','gamma'];
+
+  function normalizeBands(bands) {
+    if (!bands || typeof bands !== 'object') return null;
+    const vals = bandOrder.map(k => Number(bands[k] ?? 0));
+    const sum = vals.reduce((a,b) => a + (Number.isFinite(b) ? b : 0), 0);
+    if (!(sum > 0)) return bandOrder.reduce((o,k) => (o[k]=0,o), {});
+    const out = {};
+    for (let i=0;i<bandOrder.length;i++) out[bandOrder[i]] = vals[i] / sum;
+    return out;
+  }
+
+  function setMini(valEl, barEl, x) {
+    if (!valEl || !barEl) return;
+    if (!Number.isFinite(x)) {
+      valEl.textContent = '--';
+      barEl.style.width = '0%';
+      return;
+    }
+    valEl.textContent = `${Math.round(x*100)}%`;
+    barEl.style.width = pct01(x);
+  }
+
+
+
+
+
+  function drawGrid() {
+    const w = gridCanvas.width, h = gridCanvas.height;
+    gridCtx.clearRect(0,0,w,h);
+
+    const n = series.length;
+    if (!n) return;
+
+    const cols = 4;
+    const rows = Math.ceil(n / cols);
+    const pad = 12;
+    const cellW = (w - pad*(cols+1)) / cols;
+    const cellH = (h - pad*(rows+1)) / rows;
+
+    gridCtx.fillStyle = '#ffffff';
+    gridCtx.fillRect(0,0,w,h);
+
+    const colors = ['#2563eb','#db2777','#16a34a','#f59e0b','#7c3aed','#0891b2','#dc2626','#65a30d'];
+
+    for (let i=0;i<n;i++) {
+      const r = Math.floor(i / cols);
+      const c = i % cols;
+      const x0 = pad + c*(cellW + pad);
+      const y0 = pad + r*(cellH + pad);
+
+      gridCtx.fillStyle = '#ffffff';
+      gridCtx.strokeStyle = 'rgba(15,23,42,0.12)';
+      gridCtx.lineWidth = 1;
+      gridCtx.fillRect(x0, y0, cellW, cellH);
+      gridCtx.strokeRect(x0, y0, cellW, cellH);
+
+      gridCtx.strokeStyle = 'rgba(15,23,42,0.06)';
+      gridCtx.beginPath();
+      gridCtx.moveTo(x0 + 10, y0 + cellH/2);
+      gridCtx.lineTo(x0 + cellW - 10, y0 + cellH/2);
+      gridCtx.stroke();
+
+      const data = series[i];
+      const lastN = Math.min(160, data.length);
+      if (lastN < 2) {
+        gridCtx.fillStyle = 'rgba(15,23,42,0.70)';
+        gridCtx.font = '12px ui-sans-serif, system-ui';
+        gridCtx.fillText(channels[i] || `Ch${i+1}`, x0 + 10, y0 + 16);
+        continue;
+      }
+      const seg = data.slice(-lastN);
+
+      const sorted = seg.slice().sort((a,b)=>a-b);
+      const lo = sorted[Math.floor(0.10*(sorted.length-1))];
+      const hi = sorted[Math.floor(0.90*(sorted.length-1))];
+      const mid = 0.5*(lo+hi);
+      const span = Math.max(1e-6, (hi-lo));
+
+      gridCtx.strokeStyle = colors[i % colors.length];
+      gridCtx.lineWidth = 1.6;
+      gridCtx.beginPath();
+      for (let j=0;j<seg.length;j++) {
+        const x = x0 + 10 + (j/(lastN-1)) * (cellW-20);
+        const norm = (seg[j]-mid)/span;
+        const y = (y0 + cellH/2) - norm*(cellH*0.72);
+        if (j===0) gridCtx.moveTo(x,y); else gridCtx.lineTo(x,y);
+      }
+      gridCtx.stroke();
+
+      gridCtx.fillStyle = 'rgba(15,23,42,0.72)';
+      gridCtx.font = '12px ui-sans-serif, system-ui';
+      gridCtx.fillText(channels[i] || `Ch${i+1}`, x0 + 10, y0 + 16);
+    }
+  }
+
+  let vaHistory = [];
+
+  function drawVA() {
+    const w = vaCanvas.width, h = vaCanvas.height;
+    vaCtx.clearRect(0,0,w,h);
+
+    vaCtx.fillStyle = '#ffffff';
+    vaCtx.fillRect(0,0,w,h);
+
+    const pad = 30;
+    const x0 = pad;
+    const y0 = pad;
+    const x1 = w - pad;
+    const y1 = h - pad;
+
+    // grid
+    vaCtx.strokeStyle = 'rgba(15,23,42,0.08)';
+    vaCtx.lineWidth = 1;
+    for (let i=0;i<=4;i++) {
+      const xx = x0 + (i/4)*(x1-x0);
+      const yy = y0 + (i/4)*(y1-y0);
+      vaCtx.beginPath(); vaCtx.moveTo(xx,y0); vaCtx.lineTo(xx,y1); vaCtx.stroke();
+      vaCtx.beginPath(); vaCtx.moveTo(x0,yy); vaCtx.lineTo(x1,yy); vaCtx.stroke();
+    }
+
+    // axes
+    vaCtx.strokeStyle = 'rgba(15,23,42,0.18)';
+    vaCtx.beginPath();
+    vaCtx.moveTo((x0+x1)/2, y0);
+    vaCtx.lineTo((x0+x1)/2, y1);
+    vaCtx.moveTo(x0, (y0+y1)/2);
+    vaCtx.lineTo(x1, (y0+y1)/2);
+    vaCtx.stroke();
+
+    // labels
+    vaCtx.fillStyle = 'rgba(15,23,42,0.78)';
+    vaCtx.font = '12px ui-sans-serif, system-ui';
+    vaCtx.fillText('Valence (−1 → +1)', x0, y1 + 18);
+    vaCtx.save();
+    vaCtx.translate(x0 - 18, y1);
+    vaCtx.rotate(-Math.PI/2);
+    vaCtx.fillText('Arousal (0 → 1)', 0, 0);
+    vaCtx.restore();
+
+    // quadrant captions (match label rules)
+    vaCtx.fillStyle = 'rgba(15,23,42,0.55)';
+    vaCtx.font = '12px ui-sans-serif, system-ui';
+    vaCtx.fillText('Excited', (x0+x1)/2 + 10, y0 + 16);
+    vaCtx.fillText('Stressed', x0 + 10, y0 + 16);
+    vaCtx.fillText('Calm', (x0+x1)/2 + 10, y1 - 10);
+    vaCtx.fillText('Fatigued', x0 + 10, y1 - 10);
+
+    // trail with fade
+    if (vaHistory.length >= 2) {
+      for (let i=1;i<vaHistory.length;i++) {
+        const p0 = vaHistory[i-1];
+        const p1 = vaHistory[i];
+        const a = i/(vaHistory.length-1);
+        const alpha = 0.10 + 0.55 * a;
+        vaCtx.strokeStyle = `rgba(37,99,235,${alpha})`;
+        vaCtx.lineWidth = 2;
+        vaCtx.beginPath();
+        const xA = x0 + ((p0.v + 1)/2) * (x1-x0);
+        const yA = y1 - (p0.a) * (y1-y0);
+        const xB = x0 + ((p1.v + 1)/2) * (x1-x0);
+        const yB = y1 - (p1.a) * (y1-y0);
+        vaCtx.moveTo(xA,yA);
+        vaCtx.lineTo(xB,yB);
+        vaCtx.stroke();
+      }
+    }
+
+    if (vaHistory.length) {
+      const p = vaHistory[vaHistory.length-1];
+      const x = x0 + ((p.v + 1)/2) * (x1-x0);
+      const y = y1 - (p.a) * (y1-y0);
+
+      // crosshair
+      vaCtx.strokeStyle = 'rgba(37,99,235,0.20)';
+      vaCtx.beginPath();
+      vaCtx.moveTo(x, y0);
+      vaCtx.lineTo(x, y1);
+      vaCtx.moveTo(x0, y);
+      vaCtx.lineTo(x1, y);
+      vaCtx.stroke();
+
+      // point + ring
+      vaCtx.fillStyle = '#2563eb';
+      vaCtx.beginPath();
+      vaCtx.arc(x, y, 5, 0, Math.PI*2);
+      vaCtx.fill();
+      vaCtx.strokeStyle = 'rgba(37,99,235,0.35)';
+      vaCtx.lineWidth = 4;
+      vaCtx.beginPath();
+      vaCtx.arc(x, y, 9, 0, Math.PI*2);
+      vaCtx.stroke();
+
+      // readout
+      vaCtx.fillStyle = 'rgba(15,23,42,0.75)';
+      vaCtx.fillText(`v=${p.v.toFixed(2)}  a=${p.a.toFixed(2)}`, x0, y0 - 10);
+    }
+  }
+
+
+  const maxPoints = 520;
+  let channels = ['F3','F4','C3','C4'];
+  let series = channels.map(() => []);
+
+  function draw() {
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0,0,w,h);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0,0,w,h);
+
+    const pad = 18;
+    const plotH = h - pad*2;
+    const chH = plotH / series.length;
+    const colors = ['#2563eb','#db2777','#16a34a','#f59e0b','#7c3aed','#0891b2','#dc2626','#65a30d'];
+
+    // subtle separators
+    ctx.strokeStyle = 'rgba(15,23,42,0.06)';
+    ctx.lineWidth = 1;
+    for (let i=1;i<series.length;i++) {
+      const y = pad + i*chH;
+      ctx.beginPath();
+      ctx.moveTo(pad, y);
+      ctx.lineTo(w-pad, y);
+      ctx.stroke();
+    }
+
+    for (let c=0;c<series.length;c++) {
+      const data = series[c];
+      if (data.length < 2) continue;
+
+      const sorted = data.slice().sort((a,b)=>a-b);
+      const lo = sorted[Math.floor(0.10*(sorted.length-1))];
+      const hi = sorted[Math.floor(0.90*(sorted.length-1))];
+      const mid = 0.5*(lo+hi);
+      const span = Math.max(1e-6, (hi-lo));
+
+      ctx.strokeStyle = colors[c % colors.length];
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      for (let i=0;i<data.length;i++) {
+        const x = (i/(maxPoints-1)) * (w-2*pad) + pad;
+        const y0 = pad + c*chH;
+        const norm = (data[i]-mid)/span;
+        const y = y0 + chH/2 - norm * (chH*0.72);
+        if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(15,23,42,0.70)';
+      ctx.font = '12px ui-sans-serif, system-ui';
+      ctx.fillText(channels[c] || `Ch${c+1}`, 10, pad + c*chH + 14);
+    }
+
+    drawGrid();
+    drawVA();
+    requestAnimationFrame(draw);
+  }
+
+  function pushWaveform(row) {
+    if (!Array.isArray(row)) return;
+    if (row.length !== series.length) {
+      channels = Array.from({length: row.length}, (_, i) => `Ch${i+1}`);
+      series = channels.map(() => []);
+      channelsEl.textContent = `Channels: ${channels.join(', ')}`;
+    }
+    for (let i=0;i<row.length;i++) {
+      const arr = series[i];
+      arr.push(row[i]);
+      if (arr.length > maxPoints) arr.splice(0, arr.length - maxPoints);
+    }
+  }
+
+  draw();
+
+  const ws = new WebSocket(WS_URL);
+  ws.onopen = () => {
+    dotEl.classList.remove('bad');
+    dotEl.classList.add('ok');
+    statusEl.lastChild && statusEl.removeChild(statusEl.lastChild);
+    statusEl.appendChild(document.createTextNode(`Connected`));
+  };
+  ws.onclose = () => {
+    dotEl.classList.remove('ok');
+    dotEl.classList.add('bad');
+    statusEl.lastChild && statusEl.removeChild(statusEl.lastChild);
+    statusEl.appendChild(document.createTextNode('Disconnected'));
+  };
+  ws.onerror = () => {
+    dotEl.classList.remove('ok');
+    dotEl.classList.add('bad');
+    statusEl.lastChild && statusEl.removeChild(statusEl.lastChild);
+    statusEl.appendChild(document.createTextNode('WebSocket error'));
+  };
+
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data);
+    if (msg.type === 'hello') {
+      channels = msg.channels || channels;
+      series = channels.map(() => []);
+      channelsEl.textContent = `Channels: ${channels.join(', ')}`;
+      return;
+    }
+
+    if (msg.emotion) {
+      const label = msg.emotion.label;
+      const val = Number(msg.emotion.valence);
+      const aro = Number(msg.emotion.arousal);
+      const conf = Number(msg.emotion.confidence);
+
+      emotionLabelEl.textContent = label;
+      emojiEl.textContent = emojiFor(label, val, aro);
+
+      valenceEl.textContent = Number.isFinite(val) ? val.toFixed(2) : '--';
+      arousalEl.textContent = Number.isFinite(aro) ? aro.toFixed(2) : '--';
+      confidenceEl.textContent = Number.isFinite(conf) ? conf.toFixed(2) : '--';
+
+      if (Number.isFinite(aro)) arousalBarEl.style.width = pct01(aro);
+
+      if (Number.isFinite(val) && Number.isFinite(aro)) {
+        vaHistory.push({ v: Math.max(-1, Math.min(1, val)), a: clamp01(aro) });
+        if (vaHistory.length > 120) vaHistory.shift();
+      }
+    }
+
+    if (msg.band_power && msg.band_power.values) {
+      const bp = msg.band_power.values;
+      const chanN = (Array.isArray(msg.band_power.channels) ? msg.band_power.channels.length : 0) || 1;
+
+      const abs = {};
+      for (const k of bandOrder) {
+        const arr = Array.isArray(bp[k]) ? bp[k] : [];
+        const mean = arr.slice(0, chanN).reduce((a,b) => a + (Number.isFinite(Number(b)) ? Number(b) : 0), 0) / chanN;
+        abs[k] = mean;
+      }
+
+      const rel = normalizeBands(abs);
+      if (rel) {
+        setMini(alphaValEl, alphaBarEl, rel.alpha);
+        setMini(betaValEl, betaBarEl, rel.beta);
+        setMini(thetaValEl, thetaBarEl, rel.theta);
+        setMini(gammaValEl, gammaBarEl, rel.gamma);
+      }
+    }
+
+    const wf = msg.eeg && msg.eeg.waveform;
+    if (Array.isArray(wf) && wf.length) pushWaveform(wf[0]);
+  };
+})();
+</script>
+</body>
+</html>
